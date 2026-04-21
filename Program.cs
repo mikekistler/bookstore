@@ -23,9 +23,14 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Bookstore gRPC Transcoding API",
+        Title = "bookstore.example.com",
         Version = "v1",
-        Description = "A gRPC Bookstore service with JSON transcoding and OpenAPI output."
+        Description = "An API for bookstore.example.com",
+        Contact = new OpenApiContact
+        {
+            Name = "API support",
+            Email = "aepsupport@aep.dev"
+        }
     });
 
     options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
