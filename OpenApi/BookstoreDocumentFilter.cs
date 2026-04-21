@@ -8,6 +8,8 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
 {
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
+        swaggerDoc.Paths.Clear();
+
         AddCollectionPath(
             swaggerDoc,
             context,
@@ -35,26 +37,26 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         AddCollectionPath(
             swaggerDoc,
             context,
-            route: "/{parent}/books",
+            route: "/publishers/{publisher_id}/books",
             tag: "Books",
             listSummary: "List books under a publisher",
             createSummary: "Create a book under a publisher",
             listResponseType: typeof(ListBooksResponse),
             createBodyType: typeof(Book),
-            queryParameters: [PathParameter("parent"), QueryParameter("page_token"), QueryParameter("max_page_size")],
-            createParameters: [PathParameter("parent"), QueryParameter("id")]);
+            queryParameters: [PathParameter("publisher_id"), QueryParameter("page_token"), QueryParameter("max_page_size")],
+            createParameters: [PathParameter("publisher_id"), QueryParameter("id")]);
 
         AddCollectionPath(
             swaggerDoc,
             context,
-            route: "/{parent}/editions",
+            route: "/publishers/{publisher_id}/books/{book_id}/editions",
             tag: "Book Editions",
             listSummary: "List editions under a book",
             createSummary: "Create an edition under a book",
             listResponseType: typeof(ListBookEditionsResponse),
             createBodyType: typeof(BookEdition),
-            queryParameters: [PathParameter("parent"), QueryParameter("page_token"), QueryParameter("max_page_size")],
-            createParameters: [PathParameter("parent"), QueryParameter("id")]);
+            queryParameters: [PathParameter("publisher_id"), PathParameter("book_id"), QueryParameter("page_token"), QueryParameter("max_page_size")],
+            createParameters: [PathParameter("publisher_id"), PathParameter("book_id"), QueryParameter("id")]);
 
         AddCollectionPath(
             swaggerDoc,
@@ -71,18 +73,40 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         AddCollectionPath(
             swaggerDoc,
             context,
-            route: "/{parent}/items",
+            route: "/stores/{store_id}/items",
             tag: "Items",
             listSummary: "List items under a store",
             createSummary: "Create an item under a store",
             listResponseType: typeof(ListItemsResponse),
             createBodyType: typeof(Item),
-            queryParameters: [PathParameter("parent"), QueryParameter("page_token"), QueryParameter("max_page_size"), QueryParameter("skip"), QueryParameter("filter")],
-            createParameters: [PathParameter("parent"), QueryParameter("id")]);
+            queryParameters: [PathParameter("store_id"), QueryParameter("page_token"), QueryParameter("max_page_size"), QueryParameter("skip"), QueryParameter("filter")],
+            createParameters: [PathParameter("store_id"), QueryParameter("id")]);
 
-        AddResourcePath(swaggerDoc, context);
-        AddActionPath(swaggerDoc, context, "/{path}:archive", "Books", "Archive a book", typeof(ArchiveBookRequest), typeof(Aep.Api.Operation));
-        AddActionPath(swaggerDoc, context, "/{path}:move", "Items", "Move an item to a different store", typeof(MoveItemRequest), typeof(Aep.Api.Operation));
+        AddResourcePath(swaggerDoc, context, "/publishers/{publisher_id}/books/{book_id}", "Books", typeof(Book), [PathParameter("publisher_id"), PathParameter("book_id")], allowPatch: true, allowPut: true, allowDelete: true, includeForceOnDelete: true);
+        AddResourcePath(swaggerDoc, context, "/publishers/{publisher_id}/books/{book_id}/editions/{book_edition_id}", "Book Editions", typeof(BookEdition), [PathParameter("publisher_id"), PathParameter("book_id"), PathParameter("book_edition_id")], allowPatch: false, allowPut: false, allowDelete: true);
+        AddResourcePath(swaggerDoc, context, "/isbns/{isbn_id}", "ISBNs", typeof(Isbn), [PathParameter("isbn_id")], allowPatch: false, allowPut: false, allowDelete: false);
+        AddResourcePath(swaggerDoc, context, "/stores/{store_id}/items/{item_id}", "Items", typeof(Item), [PathParameter("store_id"), PathParameter("item_id")], allowPatch: true, allowPut: false, allowDelete: true);
+        AddResourcePath(swaggerDoc, context, "/publishers/{publisher_id}", "Publishers", typeof(Publisher), [PathParameter("publisher_id")], allowPatch: true, allowPut: true, allowDelete: true, includeForceOnDelete: true);
+        AddResourcePath(swaggerDoc, context, "/stores/{store_id}", "Stores", typeof(Store), [PathParameter("store_id")], allowPatch: true, allowPut: false, allowDelete: true, includeForceOnDelete: true);
+
+        AddActionPath(
+            swaggerDoc,
+            context,
+            "/publishers/{publisher_id}/books/{book_id}:archive",
+            "Books",
+            "Archive a book",
+            [PathParameter("publisher_id"), PathParameter("book_id")],
+            typeof(ArchiveBookRequest),
+            typeof(Aep.Api.Operation));
+        AddActionPath(
+            swaggerDoc,
+            context,
+            "/stores/{store_id}/items/{item_id}:move",
+            "Items",
+            "Move an item to a different store",
+            [PathParameter("store_id"), PathParameter("item_id")],
+            typeof(MoveItemRequest),
+            typeof(Aep.Api.Operation));
     }
 
     private static void AddCollectionPath(
@@ -117,86 +141,68 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         };
     }
 
-    private static void AddResourcePath(OpenApiDocument document, DocumentFilterContext context)
+    private static void AddResourcePath(
+        OpenApiDocument document,
+        DocumentFilterContext context,
+        string route,
+        string tag,
+        Type resourceType,
+        IList<OpenApiParameter> pathParameters,
+        bool allowPatch,
+        bool allowPut,
+        bool allowDelete,
+        bool includeForceOnDelete = false)
     {
-        var oneOfResources = OneOfSchema(
-            context,
-            typeof(Book),
-            typeof(BookEdition),
-            typeof(Isbn),
-            typeof(Item),
-            typeof(Publisher),
-            typeof(Store));
-
-        var mutableResources = OneOfSchema(
-            context,
-            typeof(Book),
-            typeof(Item),
-            typeof(Publisher),
-            typeof(Store));
-
-        var path = GetOrCreatePath(document, "/{path}");
+        var path = GetOrCreatePath(document, route);
 
         path.Operations[OperationType.Get] = new OpenApiOperation
         {
             Summary = "Get a resource by its canonical path",
-            Tags = [new OpenApiTag { Name = "Resources" }],
-            Parameters = [PathParameter("path")],
-            Responses =
-            {
-                ["200"] = new OpenApiResponse
-                {
-                    Description = "The matching resource.",
-                    Content = JsonContent(oneOfResources)
-                }
-            }
+            Tags = [new OpenApiTag { Name = tag }],
+            Parameters = pathParameters.ToList(),
+            Responses = OkResponse(context, resourceType)
         };
 
-        path.Operations[OperationType.Patch] = new OpenApiOperation
+        if (allowPatch)
         {
-            Summary = "Update a mutable resource by path",
-            Tags = [new OpenApiTag { Name = "Resources" }],
-            Parameters = [PathParameter("path"), QueryParameter("update_mask")],
-            RequestBody = JsonBody(mutableResources),
-            Responses =
+            path.Operations[OperationType.Patch] = new OpenApiOperation
             {
-                ["200"] = new OpenApiResponse
-                {
-                    Description = "The updated resource.",
-                    Content = JsonContent(mutableResources)
-                }
-            }
-        };
+                Summary = "Update a resource by path",
+                Tags = [new OpenApiTag { Name = tag }],
+                Parameters = [.. pathParameters, QueryParameter("update_mask")],
+                RequestBody = JsonBody(context, resourceType),
+                Responses = OkResponse(context, resourceType)
+            };
+        }
 
-        path.Operations[OperationType.Put] = new OpenApiOperation
+        if (allowPut)
         {
-            Summary = "Apply or upsert a mutable resource by path",
-            Tags = [new OpenApiTag { Name = "Resources" }],
-            Parameters = [PathParameter("path")],
-            RequestBody = JsonBody(mutableResources),
-            Responses =
+            path.Operations[OperationType.Put] = new OpenApiOperation
             {
-                ["200"] = new OpenApiResponse
-                {
-                    Description = "The applied resource.",
-                    Content = JsonContent(mutableResources)
-                }
-            }
-        };
+                Summary = "Apply or upsert a resource by path",
+                Tags = [new OpenApiTag { Name = tag }],
+                Parameters = pathParameters.ToList(),
+                RequestBody = JsonBody(context, resourceType),
+                Responses = OkResponse(context, resourceType)
+            };
+        }
 
-        path.Operations[OperationType.Delete] = new OpenApiOperation
+        if (allowDelete)
         {
-            Summary = "Delete a resource by path",
-            Tags = [new OpenApiTag { Name = "Resources" }],
-            Parameters = [PathParameter("path"), QueryParameter("force")],
-            Responses =
+            var parameters = pathParameters.ToList();
+            if (includeForceOnDelete)
             {
-                ["200"] = new OpenApiResponse
-                {
-                    Description = "The delete completed."
-                }
+                parameters.Add(QueryParameter("force"));
             }
-        };
+
+            path.Operations[OperationType.Delete] = new OpenApiOperation
+            {
+                Summary = "Delete a resource by path",
+                Tags = [new OpenApiTag { Name = tag }],
+                Parameters = parameters,
+                Responses = OkResponse(context, typeof(Google.Protobuf.WellKnownTypes.Empty))
+            };
+        }
     }
 
     private static void AddActionPath(
@@ -205,6 +211,7 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         string route,
         string tag,
         string summary,
+        IList<OpenApiParameter> pathParameters,
         Type requestType,
         Type responseType)
     {
@@ -214,7 +221,7 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         {
             Summary = summary,
             Tags = [new OpenApiTag { Name = tag }],
-            Parameters = [PathParameter("path")],
+            Parameters = pathParameters.ToList(),
             RequestBody = JsonBody(context, requestType),
             Responses = OkResponse(context, responseType)
         };
@@ -258,14 +265,6 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
             {
                 Schema = schema
             }
-        };
-
-    private static OpenApiSchema OneOfSchema(DocumentFilterContext context, params Type[] types)
-        => new()
-        {
-            OneOf = types
-                .Select(type => context.SchemaGenerator.GenerateSchema(type, context.SchemaRepository))
-                .ToList()
         };
 
     private static OpenApiParameter PathParameter(string name)
