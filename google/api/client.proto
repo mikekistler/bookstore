@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package google.api;
+
+option csharp_namespace = "Google.Api";
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MethodOptions {
+  repeated string method_signature = 1051;
+}

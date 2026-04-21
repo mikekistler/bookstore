@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package aep.api;
+
+option csharp_namespace = "Aep.Api";
+
+import "google/protobuf/descriptor.proto";
+
+enum FieldBehavior {
+  FIELD_BEHAVIOR_UNSPECIFIED = 0;
+  FIELD_BEHAVIOR_OPTIONAL = 1;
+  FIELD_BEHAVIOR_REQUIRED = 2;
+  FIELD_BEHAVIOR_OUTPUT_ONLY = 3;
+}
+
+message FieldInfo {
+  repeated FieldBehavior field_behavior = 1;
+  repeated string resource_reference = 2;
+}
+
+extend google.protobuf.FieldOptions {
+  FieldInfo field_info = 50001;
+}

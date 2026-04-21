@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package aep.api;
+
+option csharp_namespace = "Aep.Api";
+
+import "google/protobuf/descriptor.proto";
+
+message ResourceDescriptor {
+  string type = 1;
+  repeated string pattern = 2;
+  string singular = 3;
+  string plural = 4;
+}
+
+extend google.protobuf.MessageOptions {
+  ResourceDescriptor resource = 50002;
+}

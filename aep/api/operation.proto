@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package aep.api;
+
+option csharp_namespace = "Aep.Api";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
+
+message Operation {
+  string name = 1;
+  bool done = 2;
+  google.protobuf.Any response = 3;
+  string message = 4;
+}
+
+message OperationInfo {
+  string response_type = 1;
+}
+
+extend google.protobuf.MethodOptions {
+  OperationInfo operation_info = 50003;
+}

@@ -1,0 +1,73 @@
+@baseUrl = http://localhost:5238
+
+### OpenAPI document
+GET {{baseUrl}}/openapi/v1.json
+
+### Create a publisher
+POST {{baseUrl}}/publishers?id=fabrikam
+Content-Type: application/json
+
+{
+  "description": "Fabrikam Press"
+}
+
+### List publishers
+GET {{baseUrl}}/publishers?parent=-
+
+### Create a book
+POST {{baseUrl}}/publishers/fabrikam/books?id=grpc-in-action
+Content-Type: application/json
+
+{
+  "isbn": [
+    "978-1-23456-789-0"
+  ],
+  "price": 42,
+  "published": true,
+  "edition": 1,
+  "author": [
+    {
+      "given_name": "Ada",
+      "family_name": "Lovelace"
+    }
+  ]
+}
+
+### Get a book
+GET {{baseUrl}}/publishers/fabrikam/books/grpc-in-action
+
+### Archive a book
+POST {{baseUrl}}/publishers/fabrikam/books/grpc-in-action:archive
+Content-Type: application/json
+
+{
+  "path": "publishers/fabrikam/books/grpc-in-action"
+}
+
+### Create a store
+POST {{baseUrl}}/stores?id=downtown
+Content-Type: application/json
+
+{
+  "name": "Downtown Books",
+  "description": "Main retail location"
+}
+
+### Create an item
+POST {{baseUrl}}/stores/downtown/items?id=copy-1
+Content-Type: application/json
+
+{
+  "book": "publishers/fabrikam/books/grpc-in-action",
+  "condition": "new",
+  "price": 39.95
+}
+
+### Move an item
+POST {{baseUrl}}/stores/downtown/items/copy-1:move
+Content-Type: application/json
+
+{
+  "path": "stores/downtown/items/copy-1",
+  "target_store": "stores/sample-store"
+}
