@@ -1,5 +1,6 @@
+using System.Net.Http;
 using Example.Bookstore.V1;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace bookstore.OpenApi;
@@ -118,23 +119,23 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         string createSummary,
         Type listResponseType,
         Type createBodyType,
-        IList<OpenApiParameter> queryParameters,
-        IList<OpenApiParameter> createParameters)
+        IList<IOpenApiParameter> queryParameters,
+        IList<IOpenApiParameter> createParameters)
     {
         var path = GetOrCreatePath(document, route);
 
-        path.Operations[OperationType.Get] = new OpenApiOperation
+        path.Operations[HttpMethod.Get] = new OpenApiOperation
         {
             Summary = listSummary,
-            Tags = [new OpenApiTag { Name = tag }],
+            Tags = new HashSet<OpenApiTagReference> { new(tag) },
             Parameters = queryParameters,
             Responses = OkResponse(context, listResponseType)
         };
 
-        path.Operations[OperationType.Post] = new OpenApiOperation
+        path.Operations[HttpMethod.Post] = new OpenApiOperation
         {
             Summary = createSummary,
-            Tags = [new OpenApiTag { Name = tag }],
+            Tags = new HashSet<OpenApiTagReference> { new(tag) },
             Parameters = createParameters,
             RequestBody = JsonBody(context, createBodyType),
             Responses = OkResponse(context, createBodyType)
@@ -147,7 +148,7 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         string route,
         string tag,
         Type resourceType,
-        IList<OpenApiParameter> pathParameters,
+        IList<IOpenApiParameter> pathParameters,
         bool allowPatch,
         bool allowPut,
         bool allowDelete,
@@ -155,20 +156,20 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
     {
         var path = GetOrCreatePath(document, route);
 
-        path.Operations[OperationType.Get] = new OpenApiOperation
+        path.Operations[HttpMethod.Get] = new OpenApiOperation
         {
             Summary = "Get a resource by its canonical path",
-            Tags = [new OpenApiTag { Name = tag }],
+            Tags = new HashSet<OpenApiTagReference> { new(tag) },
             Parameters = pathParameters.ToList(),
             Responses = OkResponse(context, resourceType)
         };
 
         if (allowPatch)
         {
-            path.Operations[OperationType.Patch] = new OpenApiOperation
+            path.Operations[HttpMethod.Patch] = new OpenApiOperation
             {
                 Summary = "Update a resource by path",
-                Tags = [new OpenApiTag { Name = tag }],
+                Tags = new HashSet<OpenApiTagReference> { new(tag) },
                 Parameters = [.. pathParameters, QueryParameter("update_mask")],
                 RequestBody = JsonBody(context, resourceType),
                 Responses = OkResponse(context, resourceType)
@@ -177,10 +178,10 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
 
         if (allowPut)
         {
-            path.Operations[OperationType.Put] = new OpenApiOperation
+            path.Operations[HttpMethod.Put] = new OpenApiOperation
             {
                 Summary = "Apply or upsert a resource by path",
-                Tags = [new OpenApiTag { Name = tag }],
+                Tags = new HashSet<OpenApiTagReference> { new(tag) },
                 Parameters = pathParameters.ToList(),
                 RequestBody = JsonBody(context, resourceType),
                 Responses = OkResponse(context, resourceType)
@@ -195,10 +196,10 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
                 parameters.Add(QueryParameter("force"));
             }
 
-            path.Operations[OperationType.Delete] = new OpenApiOperation
+            path.Operations[HttpMethod.Delete] = new OpenApiOperation
             {
                 Summary = "Delete a resource by path",
-                Tags = [new OpenApiTag { Name = tag }],
+                Tags = new HashSet<OpenApiTagReference> { new(tag) },
                 Parameters = parameters,
                 Responses = OkResponse(context, typeof(Google.Protobuf.WellKnownTypes.Empty))
             };
@@ -211,16 +212,16 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
         string route,
         string tag,
         string summary,
-        IList<OpenApiParameter> pathParameters,
+        IList<IOpenApiParameter> pathParameters,
         Type requestType,
         Type responseType)
     {
         var path = GetOrCreatePath(document, route);
 
-        path.Operations[OperationType.Post] = new OpenApiOperation
+        path.Operations[HttpMethod.Post] = new OpenApiOperation
         {
             Summary = summary,
-            Tags = [new OpenApiTag { Name = tag }],
+            Tags = new HashSet<OpenApiTagReference> { new(tag) },
             Parameters = pathParameters.ToList(),
             RequestBody = JsonBody(context, requestType),
             Responses = OkResponse(context, responseType)
@@ -231,17 +232,20 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
     {
         if (!document.Paths.TryGetValue(route, out var path))
         {
-            path = new OpenApiPathItem();
+            path = new OpenApiPathItem
+            {
+                Operations = new Dictionary<HttpMethod, OpenApiOperation>()
+            };
             document.Paths[route] = path;
         }
 
-        return path;
+        return (OpenApiPathItem)path;
     }
 
     private static OpenApiRequestBody JsonBody(DocumentFilterContext context, Type type)
         => JsonBody(context.SchemaGenerator.GenerateSchema(type, context.SchemaRepository));
 
-    private static OpenApiRequestBody JsonBody(OpenApiSchema schema)
+    private static OpenApiRequestBody JsonBody(IOpenApiSchema schema)
         => new()
         {
             Required = true,
@@ -258,7 +262,7 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
             }
         };
 
-    private static Dictionary<string, OpenApiMediaType> JsonContent(OpenApiSchema schema)
+    private static Dictionary<string, OpenApiMediaType> JsonContent(IOpenApiSchema schema)
         => new()
         {
             ["application/json"] = new OpenApiMediaType
@@ -273,7 +277,7 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
             Name = name,
             In = ParameterLocation.Path,
             Required = true,
-            Schema = new OpenApiSchema { Type = "string" }
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String }
         };
 
     private static OpenApiParameter QueryParameter(string name)
@@ -282,6 +286,6 @@ internal sealed class BookstoreDocumentFilter : IDocumentFilter
             Name = name,
             In = ParameterLocation.Query,
             Required = false,
-            Schema = new OpenApiSchema { Type = "string" }
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String }
         };
 }

@@ -2,7 +2,7 @@ using System.Reflection;
 using bookstore.OpenApi;
 using bookstore.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +52,7 @@ var app = builder.Build();
 app.UseSwagger(options =>
 {
     options.RouteTemplate = "openapi/{documentName}.json";
+    options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
 });
 app.UseSwaggerUI(options =>
 {
